@@ -259,6 +259,13 @@ h1 {
   margin-top: 24px;
 }
 
+.scale-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 .step-actions {
   display: flex;
   flex-wrap: wrap;
@@ -434,6 +441,11 @@ h1 {
   }
 
   .session-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .scale-actions {
     align-items: stretch;
     flex-direction: column;
   }

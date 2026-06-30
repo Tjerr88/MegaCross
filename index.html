@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=11">
     <title>CrossFit Generator</title>
   </head>
   <body>
@@ -69,6 +69,10 @@
         <h2 id="activeTitle">Workout</h2>
         <div class="workout-lines" id="activeWorkout"></div>
         <div class="detail-grid" id="activeDetails"></div>
+        <div class="scale-actions">
+          <button id="scaleDownButton" class="secondary-button" type="button">- Too hard</button>
+          <button id="scaleUpButton" class="secondary-button" type="button">+ Too easy</button>
+        </div>
         <div class="session-actions">
           <button id="finishButton" class="primary-button" type="button">Finish</button>
           <button id="rerollSessionButton" class="secondary-button" type="button">Ververs</button>
@@ -84,6 +88,6 @@
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js?v=8" defer></script>
+    <script src="app.js?v=11" defer></script>
   </body>
 </html>

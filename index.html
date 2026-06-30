@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111111">
+    <meta name="description" content="CrossFit generator voor mono, gymnastic en weightlifting cycli.">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <title>CrossFit Generator</title>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">M · G · W</p>
+          <h1>CrossFit Generator</h1>
+        </div>
+        <div class="top-actions">
+          <button class="icon-button" id="installButton" type="button" aria-label="Installeren" title="Installeren">
+            <span aria-hidden="true">+</span>
+          </button>
+          <button class="icon-button" id="randomWorkoutButton" type="button" aria-label="Willekeurige training" title="Willekeurige training">
+            <span aria-hidden="true">?</span>
+          </button>
+          <button class="icon-button" id="rerollAllButton" type="button" aria-label="Nieuwe cyclus" title="Nieuwe cyclus">
+            <span aria-hidden="true">↻</span>
+          </button>
+        </div>
+      </header>
+
+      <section class="control-strip" aria-label="Generator instellingen">
+        <label class="field">
+          <span>Seed</span>
+          <input id="seedInput" type="text" autocomplete="off" spellcheck="false">
+        </label>
+        <label class="field">
+          <span>Niveau</span>
+          <select id="levelSelect">
+            <option value="rx">Rx</option>
+            <option value="intermediate" selected>Intermediate</option>
+            <option value="scaled">Scaled</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Duur</span>
+          <select id="durationSelect">
+            <option value="short">Kort</option>
+            <option value="standard" selected>Standaard</option>
+            <option value="long">Lang</option>
+          </select>
+        </label>
+      </section>
+
+      <section class="today-panel" aria-labelledby="activeTitle">
+        <div class="session-meta">
+          <span id="activeSlot">Sessie 1</span>
+          <span id="activePattern">Monostructural</span>
+        </div>
+        <h2 id="activeTitle">Workout</h2>
+        <div class="workout-lines" id="activeWorkout"></div>
+        <div class="detail-grid" id="activeDetails"></div>
+        <div class="session-actions">
+          <button id="rerollSessionButton" class="primary-button" type="button">Ververs sessie</button>
+          <button id="randomWorkoutWideButton" class="secondary-button" type="button">Willekeurige training</button>
+          <button id="copyButton" class="secondary-button" type="button">Kopieer</button>
+        </div>
+      </section>
+
+      <nav class="cycle-nav" id="cycleNav" aria-label="Cyclus sessies"></nav>
+
+      <section class="cycle-list" aria-label="Volledige cyclus">
+        <div class="section-heading">
+          <h2>Cyclus</h2>
+          <span id="cycleSummary"></span>
+        </div>
+        <div class="cards" id="cards"></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="app.js" defer></script>
+  </body>
+</html>

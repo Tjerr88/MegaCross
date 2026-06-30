@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="CrossFit Generator">
+  <rect width="512" height="512" fill="#111111"/>
+  <circle cx="256" cy="256" r="214" fill="#faf8f0"/>
+  <rect x="96" y="126" width="320" height="64" rx="14" fill="#f5b83d"/>
+  <rect x="96" y="224" width="320" height="64" rx="14" fill="#e9483f"/>
+  <rect x="96" y="322" width="320" height="64" rx="14" fill="#0e8f72"/>
+  <path d="M151 158h210M151 256h210M151 354h210" stroke="#111111" stroke-width="22" stroke-linecap="round"/>
+  <path d="M256 112v288" stroke="#111111" stroke-width="20" stroke-linecap="round"/>
+</svg>

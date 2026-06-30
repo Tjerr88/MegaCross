@@ -8,7 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="icon.svg">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=8">
     <title>CrossFit Generator</title>
   </head>
   <body>
@@ -25,9 +25,7 @@
           <button class="icon-button" id="randomWorkoutButton" type="button" aria-label="Willekeurige training" title="Willekeurige training">
             <span aria-hidden="true">?</span>
           </button>
-          <button class="icon-button" id="rerollAllButton" type="button" aria-label="Nieuwe cyclus" title="Nieuwe cyclus">
-            <span aria-hidden="true">↻</span>
-          </button>
+          <button class="secondary-button new-cycle-button" id="rerollAllButton" type="button" hidden>Generate new cycle</button>
         </div>
       </header>
 
@@ -55,6 +53,15 @@
       </section>
 
       <section class="today-panel" aria-labelledby="activeTitle">
+        <div class="progress-row">
+          <div class="progress-copy">
+            <span id="dayLabel">Dag 1 van 13</span>
+            <strong id="progressLabel">Cyclus 1</strong>
+          </div>
+          <div class="progress-track" aria-hidden="true">
+            <span id="progressBar"></span>
+          </div>
+        </div>
         <div class="session-meta">
           <span id="activeSlot">Sessie 1</span>
           <span id="activePattern">Monostructural</span>
@@ -63,24 +70,20 @@
         <div class="workout-lines" id="activeWorkout"></div>
         <div class="detail-grid" id="activeDetails"></div>
         <div class="session-actions">
-          <button id="rerollSessionButton" class="primary-button" type="button">Ververs sessie</button>
+          <button id="finishButton" class="primary-button" type="button">Finish</button>
+          <button id="rerollSessionButton" class="secondary-button" type="button">Ververs</button>
           <button id="randomWorkoutWideButton" class="secondary-button" type="button">Willekeurige training</button>
           <button id="copyButton" class="secondary-button" type="button">Kopieer</button>
         </div>
-      </section>
-
-      <nav class="cycle-nav" id="cycleNav" aria-label="Cyclus sessies"></nav>
-
-      <section class="cycle-list" aria-label="Volledige cyclus">
-        <div class="section-heading">
-          <h2>Cyclus</h2>
-          <span id="cycleSummary"></span>
+        <div class="step-actions">
+          <button id="previousButton" type="button">Vorige</button>
+          <button id="skipButton" type="button">Skip</button>
+          <button id="resetProgressButton" type="button">Terug naar dag 1</button>
         </div>
-        <div class="cards" id="cards"></div>
       </section>
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
-    <script src="app.js" defer></script>
+    <script src="app.js?v=8" defer></script>
   </body>
 </html>

@@ -3,12 +3,12 @@ const categories = {
     label: "Monostructural",
     levels: {
       high: [
-        ["Run", "1.600-5.000 m", "engine"],
-        ["Row", "2.000-5.000 m", "engine"],
-        ["BikeErg", "4.000-10.000 m", "engine"],
-        ["Assault Bike", "40-100 cal", "engine"],
-        ["SkiErg", "1.500-3.000 m", "engine"],
-        ["Double unders", "200-500 reps", "coordination"]
+        ["Run", "5.000 m", "engine"],
+        ["Row", "2.000 m", "engine"],
+        ["BikeErg", "10.000 m", "engine"],
+        ["Assault Bike", "60 cal", "engine"],
+        ["SkiErg", "2.000 m", "engine"],
+        ["Double unders", "300 reps", "coordination"]
       ],
       medium: [
         ["Run", "400-1.000 m", "engine"],
@@ -156,6 +156,24 @@ const formatTemplates = {
   low: ["AMRAP 12", "3 rounds for time", "Chipper"]
 };
 
+const focusedTemplates = {
+  mono: {
+    high: ["For time", "Time trial", "Steady hard effort"],
+    medium: ["4 rounds for time", "AMRAP 16"],
+    low: ["AMRAP 12", "3 rounds for time"]
+  },
+  gym: {
+    high: ["EMOM 12", "Every 2 min x 8", "For quality"],
+    medium: ["AMRAP 16", "5 rounds for time"],
+    low: ["AMRAP 12", "3 rounds for time"]
+  },
+  weight: {
+    high: ["Every 2 min x 8", "EMOM 12", "For quality"],
+    medium: ["5 rounds for time", "AMRAP 16"],
+    low: ["AMRAP 12", "3 rounds for time"]
+  }
+};
+
 const els = {
   seedInput: document.querySelector("#seedInput"),
   levelSelect: document.querySelector("#levelSelect"),
@@ -165,12 +183,16 @@ const els = {
   activeTitle: document.querySelector("#activeTitle"),
   activeWorkout: document.querySelector("#activeWorkout"),
   activeDetails: document.querySelector("#activeDetails"),
-  cards: document.querySelector("#cards"),
-  cycleNav: document.querySelector("#cycleNav"),
-  cycleSummary: document.querySelector("#cycleSummary"),
+  dayLabel: document.querySelector("#dayLabel"),
+  progressLabel: document.querySelector("#progressLabel"),
+  progressBar: document.querySelector("#progressBar"),
   rerollAllButton: document.querySelector("#rerollAllButton"),
   randomWorkoutButton: document.querySelector("#randomWorkoutButton"),
   randomWorkoutWideButton: document.querySelector("#randomWorkoutWideButton"),
+  finishButton: document.querySelector("#finishButton"),
+  previousButton: document.querySelector("#previousButton"),
+  skipButton: document.querySelector("#skipButton"),
+  resetProgressButton: document.querySelector("#resetProgressButton"),
   rerollSessionButton: document.querySelector("#rerollSessionButton"),
   copyButton: document.querySelector("#copyButton"),
   installButton: document.querySelector("#installButton"),
@@ -179,11 +201,14 @@ const els = {
 
 let deferredInstallPrompt = null;
 let state = {
-  activeIndex: 0,
+  activeIndex: Number(localStorage.getItem("cfg-active-index") || 0),
+  completedCount: Number(localStorage.getItem("cfg-completed-count") || 0),
+  cycleComplete: localStorage.getItem("cfg-cycle-complete") === "true",
   seed: localStorage.getItem("cfg-seed") || String(Date.now()).slice(-6),
   level: localStorage.getItem("cfg-level") || "intermediate",
   duration: localStorage.getItem("cfg-duration") || "standard",
-  sessionSalts: JSON.parse(localStorage.getItem("cfg-salts") || "[]")
+  sessionSalts: JSON.parse(localStorage.getItem("cfg-salts") || "[]"),
+  randomSlotBag: JSON.parse(localStorage.getItem("cfg-random-slot-bag") || "[]")
 };
 
 function hashString(text) {
@@ -210,6 +235,15 @@ function pick(list, rng) {
   return list[Math.floor(rng() * list.length)];
 }
 
+function shuffledIndexes(length, rng) {
+  const indexes = Array.from({ length }, (_, index) => index);
+  for (let index = indexes.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(rng() * (index + 1));
+    [indexes[index], indexes[swapIndex]] = [indexes[swapIndex], indexes[index]];
+  }
+  return indexes;
+}
+
 function levelForIntensity(intensity) {
   return intensity === "high" ? "high" : intensity === "medium" ? "medium" : "low";
 }
@@ -222,62 +256,181 @@ function levelText(intensity) {
   }[intensity];
 }
 
-function buildSession(entry, index) {
+function pickTemplate(entry, rng) {
+  if (entry.types.length === 1) {
+    const type = entry.types[0];
+    return pick(focusedTemplates[type][entry.intensity], rng);
+  }
+  return pick(formatTemplates[entry.intensity], rng);
+}
+
+function normalizeName(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function tagsFromText(text) {
+  const value = text.toLowerCase();
+  const tags = new Set();
+  if (/pull|rope|toes|knee|muscle|ring row|chest-to-bar/.test(value)) tags.add("grip");
+  if (/deadlift|swing|clean|snatch|back extension/.test(value)) tags.add("hinge");
+  if (/handstand|hspu|overhead|push jerk|push press|thruster|wall walk/.test(value)) tags.add("overhead");
+  if (/handstand|hspu/.test(value)) tags.add("invertedPress");
+  if (/squat|wall ball|box step|box jump|lunge|pistol/.test(value)) tags.add("squat");
+  if (/run|row|bike|ski|double under|shuttle/.test(value)) tags.add("engine");
+  if (/burpee/.test(value)) tags.add("fullBody");
+  return [...tags];
+}
+
+function movementFromArray(type, selected) {
+  const text = selected.join(" ");
+  return {
+    type,
+    movement: selected[0],
+    prescription: selected[1],
+    tag: selected[2],
+    tags: [...new Set([selected[2], ...tagsFromText(text)])]
+  };
+}
+
+function benchmarkMeta(benchmark) {
+  return {
+    ...benchmark,
+    movement: benchmark.name,
+    tags: tagsFromText([benchmark.name, ...benchmark.lines].join(" "))
+  };
+}
+
+function createBuildContext() {
+  return {
+    bags: {},
+    previousMovements: new Set(),
+    previousTags: new Set(),
+    benchmarkHistory: {
+      girl: [],
+      hero: []
+    }
+  };
+}
+
+function takeFromBag(context, key, list, rng, accept) {
+  if (!list.length) return undefined;
+  if (!context.bags[key] || context.bags[key].length === 0) {
+    context.bags[key] = shuffledIndexes(list.length, rng);
+  }
+
+  let bagPosition = context.bags[key].findIndex((itemIndex) => accept(list[itemIndex], itemIndex));
+
+  if (bagPosition === -1) {
+    context.bags[key] = shuffledIndexes(list.length, rng);
+    bagPosition = context.bags[key].findIndex((itemIndex) => accept(list[itemIndex], itemIndex));
+  }
+
+  if (bagPosition === -1) bagPosition = 0;
+
+  const [selectedIndex] = context.bags[key].splice(bagPosition, 1);
+  return list[selectedIndex];
+}
+
+function blocksMovement(candidate, sessionTags, context) {
+  const name = normalizeName(candidate.movement);
+  const tags = new Set(candidate.tags);
+  if (context.previousMovements.has(name)) return true;
+  if (tags.has("grip") && sessionTags.has("grip")) return true;
+  if (tags.has("hinge") && context.previousTags.has("hinge")) return true;
+  if (tags.has("invertedPress") && context.previousTags.has("invertedPress")) return true;
+  return false;
+}
+
+function rememberSession(session, context) {
+  context.previousMovements = new Set(session.movements.map((movement) => normalizeName(movement)));
+  context.previousTags = new Set(session.tags);
+}
+
+function buildSession(entry, index, context) {
   const salt = state.sessionSalts[index] || 0;
   const rng = rngFromSeed(`${state.seed}:${state.level}:${state.duration}:${index}:${salt}`);
 
   if (entry.benchmark === "girl") {
-    const girl = pick(girls, rng);
-    return {
+    const girl = takeFromBag(context, "benchmark:girl", girls, rng, (candidate) => (
+      !context.benchmarkHistory.girl.includes(candidate.name)
+    )) || pick(girls, rng);
+    const meta = benchmarkMeta(girl);
+    const session = {
       ...entry,
       title: girl.name,
       subtitle: "Original Girl",
       lines: girl.lines,
-      details: [{ label: "Benchmark", value: "Originele CrossFit Girl" }]
+      details: [{ label: "Benchmark", value: "Originele CrossFit Girl" }],
+      movements: [girl.name],
+      tags: meta.tags
     };
+    context.benchmarkHistory.girl = [girl.name, ...context.benchmarkHistory.girl].slice(0, 3);
+    rememberSession(session, context);
+    return session;
   }
 
   if (entry.benchmark === "hero") {
-    const hero = pick(heroes, rng);
-    return {
+    const hero = takeFromBag(context, "benchmark:hero", heroes, rng, (candidate) => (
+      !context.benchmarkHistory.hero.includes(candidate.name)
+    )) || pick(heroes, rng);
+    const meta = benchmarkMeta(hero);
+    const session = {
       ...entry,
       title: hero.name,
       subtitle: "Original Hero",
       lines: hero.lines,
-      details: [{ label: "Benchmark", value: "Originele Hero WOD" }]
+      details: [{ label: "Benchmark", value: "Originele Hero WOD" }],
+      movements: [hero.name],
+      tags: meta.tags
     };
+    context.benchmarkHistory.hero = [hero.name, ...context.benchmarkHistory.hero].slice(0, 3);
+    rememberSession(session, context);
+    return session;
   }
 
-  const template = pick(formatTemplates[entry.intensity], rng);
+  const template = pickTemplate(entry, rng);
   const level = levelForIntensity(entry.intensity);
+  const sessionTags = new Set();
   const choices = entry.types.map((type) => {
-    const selected = pick(categories[type].levels[level], rng);
+    const list = categories[type].levels[level];
+    const key = `${type}:${level}`;
+    const selected = takeFromBag(context, key, list, rng, (candidate) => (
+      !blocksMovement(movementFromArray(type, candidate), sessionTags, context)
+    )) || pick(list, rng);
+    const movement = movementFromArray(type, selected);
+    movement.tags.forEach((tag) => sessionTags.add(tag));
     return {
       type,
       category: categories[type].label,
-      movement: selected[0],
-      prescription: selected[1],
-      tag: selected[2]
+      movement: movement.movement,
+      prescription: movement.prescription,
+      tag: movement.tag,
+      tags: movement.tags
     };
   });
 
   const lines = [template, ...choices.map((choice) => `${choice.prescription} ${choice.movement}`)];
   const typeNames = entry.types.map((type) => categories[type].label).join(" + ");
 
-  return {
+  const session = {
     ...entry,
     title: `${entry.slot}: ${typeNames}`,
-    subtitle: `${typeNames} · ${levelText(entry.intensity)}`,
+    subtitle: `${typeNames} - ${levelText(entry.intensity)}`,
     lines,
     details: choices.map((choice) => ({
       label: choice.category,
-      value: `${choice.movement} · ${choice.tag}`
-    }))
+      value: `${choice.movement} - ${choice.tag}`
+    })),
+    movements: choices.map((choice) => choice.movement),
+    tags: [...sessionTags]
   };
+  rememberSession(session, context);
+  return session;
 }
 
 function buildCycle() {
-  return cyclePattern.map(buildSession);
+  const context = createBuildContext();
+  return cyclePattern.map((entry, index) => buildSession(entry, index, context));
 }
 
 function renderWorkoutLines(container, lines, mini = false) {
@@ -291,30 +444,27 @@ function renderWorkoutLines(container, lines, mini = false) {
 
 function render() {
   const cycle = buildCycle();
+  state.activeIndex = ((state.activeIndex % cycle.length) + cycle.length) % cycle.length;
   const active = cycle[state.activeIndex];
+  const cycleNumber = Math.floor(state.completedCount / cycle.length) + 1;
+  const dayNumber = state.activeIndex + 1;
+  const progress = state.cycleComplete ? 100 : ((state.activeIndex + 1) / cycle.length) * 100;
 
   els.seedInput.value = state.seed;
   els.levelSelect.value = state.level;
   els.durationSelect.value = state.duration;
+  els.dayLabel.textContent = `Dag ${dayNumber} van ${cycle.length}`;
+  els.progressLabel.textContent = state.cycleComplete ? "Hero voltooid" : `Cyclus ${cycleNumber}`;
+  els.progressBar.style.width = `${progress}%`;
+  els.finishButton.hidden = state.cycleComplete;
+  els.rerollAllButton.hidden = !state.cycleComplete;
+  els.skipButton.hidden = state.cycleComplete;
   els.activeSlot.textContent = active.slot;
   els.activePattern.textContent = active.subtitle;
   els.activeTitle.textContent = active.title;
   renderWorkoutLines(els.activeWorkout, active.lines);
   els.activeDetails.innerHTML = active.details.map((detail) => (
     `<div class="detail"><b>${detail.label}</b><span>${detail.value}</span></div>`
-  )).join("");
-  els.cycleSummary.textContent = "9 sessies + 3 Girls + 1 Hero";
-
-  els.cycleNav.innerHTML = cycle.map((session, index) => (
-    `<button class="nav-pill ${index === state.activeIndex ? "active" : ""}" type="button" data-index="${index}" aria-label="${session.slot}">${navLabel(session, index)}</button>`
-  )).join("");
-
-  els.cards.innerHTML = cycle.map((session, index) => (
-    `<article class="card ${index === state.activeIndex ? "active" : ""}" data-index="${index}">
-      <div class="card-meta"><span>${session.slot}</span><span>${session.subtitle}</span></div>
-      <h3>${session.title}</h3>
-      <div class="mini-lines">${session.lines.map((line, lineIndex) => `<div><b>${lineIndex === 0 ? "" : lineIndex}</b><span>${line}</span></div>`).join("")}</div>
-    </article>`
   )).join("");
 
   persist();
@@ -327,10 +477,14 @@ function navLabel(session, index) {
 }
 
 function persist() {
+  localStorage.setItem("cfg-active-index", String(state.activeIndex));
+  localStorage.setItem("cfg-completed-count", String(state.completedCount));
+  localStorage.setItem("cfg-cycle-complete", String(state.cycleComplete));
   localStorage.setItem("cfg-seed", state.seed);
   localStorage.setItem("cfg-level", state.level);
   localStorage.setItem("cfg-duration", state.duration);
   localStorage.setItem("cfg-salts", JSON.stringify(state.sessionSalts));
+  localStorage.setItem("cfg-random-slot-bag", JSON.stringify(state.randomSlotBag));
 }
 
 function showToast(message) {
@@ -342,17 +496,76 @@ function showToast(message) {
 
 function rerollAll() {
   state.seed = String(Math.floor(Math.random() * 900000) + 100000);
+  state.activeIndex = 0;
+  state.cycleComplete = false;
   state.sessionSalts = [];
+  state.randomSlotBag = [];
   render();
+  showToast("Nieuwe cyclus gestart");
 }
 
 function rerollSession() {
+  if (state.cycleComplete) return;
   state.sessionSalts[state.activeIndex] = (state.sessionSalts[state.activeIndex] || 0) + 1;
   render();
 }
 
+function finishSession() {
+  if (state.cycleComplete) return;
+  state.completedCount += 1;
+
+  if (state.activeIndex >= cyclePattern.length - 1) {
+    state.cycleComplete = true;
+    render();
+    showToast("Hero voltooid");
+    return;
+  }
+
+  state.activeIndex += 1;
+  render();
+  showToast("Volgende sessie klaar");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function previousSession() {
+  if (state.activeIndex === 0) return;
+  state.activeIndex -= 1;
+  state.cycleComplete = false;
+  render();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function skipSession() {
+  if (state.cycleComplete) return;
+  if (state.activeIndex >= cyclePattern.length - 1) {
+    finishSession();
+    return;
+  }
+  state.activeIndex += 1;
+  render();
+  showToast("Sessie overgeslagen");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function resetProgress() {
+  state.activeIndex = 0;
+  state.cycleComplete = false;
+  render();
+  showToast("Terug naar dag 1");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function randomWorkout() {
-  state.activeIndex = Math.floor(Math.random() * cyclePattern.length);
+  state.cycleComplete = false;
+  if (!state.randomSlotBag.length) {
+    state.randomSlotBag = shuffledIndexes(cyclePattern.length, Math.random);
+  }
+  let nextIndex = state.randomSlotBag.shift();
+  if (nextIndex === state.activeIndex && state.randomSlotBag.length) {
+    state.randomSlotBag.push(nextIndex);
+    nextIndex = state.randomSlotBag.shift();
+  }
+  state.activeIndex = nextIndex;
   state.sessionSalts[state.activeIndex] = (state.sessionSalts[state.activeIndex] || 0) + 1;
   render();
   showToast("Willekeurige training geladen");
@@ -367,6 +580,10 @@ function activeText() {
 els.rerollAllButton.addEventListener("click", rerollAll);
 els.randomWorkoutButton.addEventListener("click", randomWorkout);
 els.randomWorkoutWideButton.addEventListener("click", randomWorkout);
+els.finishButton.addEventListener("click", finishSession);
+els.previousButton.addEventListener("click", previousSession);
+els.skipButton.addEventListener("click", skipSession);
+els.resetProgressButton.addEventListener("click", resetProgress);
 els.rerollSessionButton.addEventListener("click", rerollSession);
 els.copyButton.addEventListener("click", async () => {
   try {
@@ -389,21 +606,6 @@ els.durationSelect.addEventListener("change", (event) => {
   state.duration = event.target.value;
   render();
 });
-els.cycleNav.addEventListener("click", (event) => {
-  const button = event.target.closest("button[data-index]");
-  if (!button) return;
-  state.activeIndex = Number(button.dataset.index);
-  render();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
-els.cards.addEventListener("click", (event) => {
-  const card = event.target.closest(".card[data-index]");
-  if (!card) return;
-  state.activeIndex = Number(card.dataset.index);
-  render();
-  window.scrollTo({ top: 0, behavior: "smooth" });
-});
-
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
   deferredInstallPrompt = event;

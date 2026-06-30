@@ -1,9 +1,9 @@
-const CACHE_NAME = "crossfit-generator-v4";
+const CACHE_NAME = "crossfit-generator-v8";
 const ASSETS = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
+  "./styles.css?v=8",
+  "./app.js?v=8",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
